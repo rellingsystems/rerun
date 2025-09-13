@@ -1317,7 +1317,7 @@ impl App {
 
             UICommand::OpenWebHelp => {
                 egui_ctx.open_url(egui::output::OpenUrl {
-                    url: "https://www.rerun.io/docs/getting-started/navigating-the-viewer"
+                    url: "https://www.relling.com"
                         .to_owned(),
                     new_tab: true,
                 });
@@ -1325,7 +1325,7 @@ impl App {
 
             UICommand::OpenRerunDiscord => {
                 egui_ctx.open_url(egui::output::OpenUrl {
-                    url: "https://discord.gg/PXtCgFBSmH".to_owned(),
+                    url: "https://discord.com".to_owned(),
                     new_tab: true,
                 });
             }
