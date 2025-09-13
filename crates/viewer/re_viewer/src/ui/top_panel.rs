@@ -407,7 +407,7 @@ fn website_link_ui(ui: &mut egui::Ui) {
         .max_height(desired_height)
         .tint(ui.tokens().strong_fg_color);
 
-    let url = "https://rerun.io/";
+    let url = "https://relling.com";
     let response = ui
         .add(egui::ImageButton::new(image))
         .on_hover_cursor(egui::CursorIcon::PointingHand);
