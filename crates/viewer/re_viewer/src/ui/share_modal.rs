@@ -224,9 +224,6 @@ impl ShareModal {
         }
     }
 
-    // --- MODIFICATION: START ---
-    // CORRECTED: Added `startup_options` as an argument.
-    // The App struct, which has the startup_options, must pass them when it calls this function.
     pub fn ui(
         &mut self,
         ctx: &ViewerContext<'_>,
@@ -234,7 +231,6 @@ impl ShareModal {
         web_viewer_base_url: Option<&url::Url>,
         startup_options: &crate::StartupOptions,
     ) {
-    // --- MODIFICATION: END ---
         if !self.modal.is_open() {
             return;
         }
@@ -412,7 +408,7 @@ impl ShareModal {
             },
         );
     }
-}
+} // <-- THIS WAS THE MISSING BRACE
 
 // --- Rest of the helper functions (unchanged and correct) ---
 
