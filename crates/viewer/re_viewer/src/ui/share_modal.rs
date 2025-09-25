@@ -13,34 +13,37 @@ use re_viewer_context::{
     DisplayMode, ItemCollection, RecordingConfig, StoreHub, ViewerContext, open_url::ViewerOpenUrl,
 };
 
-// --- NEW HELPER FOR THE EXACT BUTTON STYLE YOU WANT ---
-/// Renders a full-width button with the primary "inverted" style, exactly like the "Download RRD" button.
+// --- CORRECTED HELPER FOR THE EXACT BUTTON STYLE YOU WANT ---
+/// Renders a full-width button with the primary "inverted" style.
 fn primary_button_style(ui: &mut egui::Ui, text: impl Into<egui::WidgetText>) -> egui::Response {
+    let widget_text = text.into();
+    let button_id_source = widget_text.text().to_owned();
+
+    // This scope correctly styles the button and handles hover effects.
     ui.scope(|ui| {
         let tokens = ui.tokens();
         let visuals = &mut ui.style_mut().visuals;
         visuals.override_text_color = Some(tokens.text_inverse);
 
-        let fill_color = if ui.is_rect_visible(ui.available_rect_before_wrap()) {
-            let response = ui.interact(
-                ui.available_rect_before_wrap(),
-                ui.id().with(&text.into_widget_text().text()),
-                egui::Sense::click(),
-            );
-            if response.hovered() {
-                tokens.bg_fill_inverse_hover
-            } else {
-                tokens.bg_fill_inverse
-            }
+        // Pre-sense the interaction to get the hover state before drawing.
+        let response = ui.interact(
+            ui.available_rect_before_wrap(),
+            ui.id().with(button_id_source), // Use the button's text for a stable ID
+            egui::Sense::click(),
+        );
+
+        let fill_color = if response.hovered() {
+            tokens.bg_fill_inverse_hover
         } else {
             tokens.bg_fill_inverse
         };
 
-        ui.add(
-            egui::Button::new(text)
-                .fill(fill_color)
-                .min_size(vec2(ui.available_width(), 32.0)),
-        )
+        // Create and add the actual button widget.
+        let button = egui::Button::new(widget_text)
+            .fill(fill_color)
+            .min_size(vec2(ui.available_width(), 32.0));
+
+        ui.add(button)
     })
     .inner
 }
@@ -250,13 +253,12 @@ impl ShareModal {
                         Self::download_file_from_url(&format!("{}.rrd", url_string), "recording.rrd");
                         download_feedback.insert("rrd".to_string(), true);
                     }
-                    if rrd_downloading {
-                        ui.ctx().request_repaint();
-                    }
+                    if rrd_downloading { ui.ctx().request_repaint(); }
 
-                    ui.add_space(8.0); // Space between RRD and annotation buttons
+                    ui.add_space(12.0);
+                    ui.label("Download Annotations:");
+                    ui.add_space(4.0);
 
-                    // --- ANNOTATION BUTTONS ---
                     if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
                         let buttons_to_draw = [
                             ("video", "annotations.mp4", "Download Annotations Video"),
@@ -265,7 +267,7 @@ impl ShareModal {
                         ];
 
                         for (id, filename, text) in buttons_to_draw {
-                            ui.add_space(4.0); // Space between each button
+                            ui.add_space(4.0);
                             let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
                             let label = if is_downloading { format!("Downloading {}...", filename) } else { text.to_string() };
 
@@ -274,20 +276,19 @@ impl ShareModal {
                                 Self::download_file_from_url(&file_url, filename);
                                 download_feedback.insert(id.to_string(), true);
                             }
-                            if is_downloading {
-                                ui.ctx().request_repaint();
-                            }
+                            if is_downloading { ui.ctx().request_repaint(); }
                         }
                     }
                 } else {
                     // --- NATIVE SHARE BUTTON ---
-                    let label = if *show_copied_feedback { "Copied!".into() } else { "Copy link".into() };
+                    let label: egui::WidgetText = if *show_copied_feedback { "Copied!".into() } else { "Copy link".into() };
                     let copy_link_response = primary_button_style(ui, label);
 
                     if copy_link_response.clicked() {
                         ui.ctx().copy_text(url_string.clone());
                         *show_copied_feedback = true;
-                    } else if !copy_link_response.hovered() {
+                    }
+                    if *show_copied_feedback && !copy_link_response.hovered() {
                         *show_copied_feedback = false;
                     }
                 }
