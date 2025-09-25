@@ -13,6 +13,39 @@ use re_viewer_context::{
     DisplayMode, ItemCollection, RecordingConfig, StoreHub, ViewerContext, open_url::ViewerOpenUrl,
 };
 
+// --- NEW HELPER FOR THE EXACT BUTTON STYLE YOU WANT ---
+/// Renders a full-width button with the primary "inverted" style, exactly like the "Download RRD" button.
+fn primary_button_style(ui: &mut egui::Ui, text: impl Into<egui::WidgetText>) -> egui::Response {
+    ui.scope(|ui| {
+        let tokens = ui.tokens();
+        let visuals = &mut ui.style_mut().visuals;
+        visuals.override_text_color = Some(tokens.text_inverse);
+
+        let fill_color = if ui.is_rect_visible(ui.available_rect_before_wrap()) {
+            let response = ui.interact(
+                ui.available_rect_before_wrap(),
+                ui.id().with(&text.into_widget_text().text()),
+                egui::Sense::click(),
+            );
+            if response.hovered() {
+                tokens.bg_fill_inverse_hover
+            } else {
+                tokens.bg_fill_inverse
+            }
+        } else {
+            tokens.bg_fill_inverse
+        };
+
+        ui.add(
+            egui::Button::new(text)
+                .fill(fill_color)
+                .min_size(vec2(ui.available_width(), 32.0)),
+        )
+    })
+    .inner
+}
+
+
 #[derive(Clone)]
 pub struct DownloadableFile {
     pub name: String,
@@ -211,92 +244,45 @@ impl ShareModal {
                 ui.add_space(12.0);
 
                 if cfg!(target_arch = "wasm32") {
-                    // --- Primary Download RRD Button ---
                     let rrd_downloading = download_feedback.get("rrd").copied().unwrap_or(false);
                     let rrd_button_label = if rrd_downloading { "Downloading RRD..." } else { "Download RRD" };
-
-                    let rrd_button_response = ui.scope(|ui| {
-                        let tokens = ui.tokens();
-                        let visuals = &mut ui.style_mut().visuals;
-                        visuals.override_text_color = Some(tokens.text_inverse);
-                        let fill_color = tokens.bg_fill_inverse;
-                        ui.add(
-                            egui::Button::new(rrd_button_label)
-                                .fill(fill_color)
-                                .min_size(vec2(ui.available_width(), 32.0)),
-                        )
-                    }).inner;
-
-                    if rrd_button_response.clicked() && !rrd_downloading {
+                    if primary_button_style(ui, rrd_button_label).clicked() && !rrd_downloading {
                         Self::download_file_from_url(&format!("{}.rrd", url_string), "recording.rrd");
                         download_feedback.insert("rrd".to_string(), true);
                     }
-                    if rrd_downloading && !rrd_button_response.hovered() {
-                        // Reset feedback when not hovering
-                        download_feedback.insert("rrd".to_string(), false);
+                    if rrd_downloading {
+                        ui.ctx().request_repaint();
                     }
 
+                    ui.add_space(8.0); // Space between RRD and annotation buttons
 
-                    ui.add_space(16.0);
+                    // --- ANNOTATION BUTTONS ---
+                    if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
+                        let buttons_to_draw = [
+                            ("video", "annotations.mp4", "Download Annotations Video"),
+                            ("coords", "coordinates.csv", "Download Annotations Coordinates"),
+                            ("actions", "actions.json", "Download Annotations Actions"),
+                        ];
 
-                    // --- Annotation Buttons ---
-                    ui.group(|ui| {
-                        ui.vertical(|ui| {
-                            ui.label("Download Annotations:");
-                            ui.add_space(8.0);
+                        for (id, filename, text) in buttons_to_draw {
+                            ui.add_space(4.0); // Space between each button
+                            let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
+                            let label = if is_downloading { format!("Downloading {}...", filename) } else { text.to_string() };
 
-                            if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
-                                let buttons_to_draw = [
-                                    ("video", "annotations.mp4", "Download Annotations Video"),
-                                    ("coords", "coordinates.csv", "Download Annotations Coordinates"),
-                                    ("actions", "actions.json", "Download Annotations Actions"),
-                                ];
-
-                                for (id, filename, text) in buttons_to_draw {
-                                    let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
-                                    let label = if is_downloading { format!("Downloading {}...", filename) } else { text.to_string() };
-
-                                    if ui.button(label).clicked() && !is_downloading {
-                                        let file_url = format!("{}_{}", base_url, filename);
-                                        Self::download_file_from_url(&file_url, filename);
-                                        download_feedback.insert(id.to_string(), true);
-                                    } else if is_downloading {
-                                        // Reset feedback
-                                        download_feedback.insert(id.to_string(), false);
-                                    }
-                                }
+                            if primary_button_style(ui, label).clicked() && !is_downloading {
+                                let file_url = format!("{}_{}", base_url, filename);
+                                Self::download_file_from_url(&file_url, filename);
+                                download_feedback.insert(id.to_string(), true);
                             }
-                        });
-                    });
+                            if is_downloading {
+                                ui.ctx().request_repaint();
+                            }
+                        }
+                    }
                 } else {
-                    // --- Primary Copy Link Button ---
-                    let (label, icon) = if *show_copied_feedback {
-                        ("Copied!".into_atoms(), None)
-                    } else {
-                        (
-                            (
-                                egui::Atom::grow(),
-                                icons::URL.as_image().tint(ui.tokens().icon_inverse),
-                                "Copy link",
-                                egui::Atom::grow(),
-                            )
-                                .into_atoms(),
-                            Some(icons::URL),
-                        )
-                    };
-
-                    let copy_link_response = ui.scope(|ui| {
-                        let tokens = ui.tokens();
-                        let visuals = &mut ui.style_mut().visuals;
-                        visuals.override_text_color = Some(tokens.text_inverse);
-                        let fill_color = tokens.bg_fill_inverse;
-                        ui.add(
-                            egui::Button::new(label)
-                                .fill(fill_color)
-                                .min_size(vec2(ui.available_width(), 20.0)),
-                        )
-                    }).inner;
-
+                    // --- NATIVE SHARE BUTTON ---
+                    let label = if *show_copied_feedback { "Copied!".into() } else { "Copy link".into() };
+                    let copy_link_response = primary_button_style(ui, label);
 
                     if copy_link_response.clicked() {
                         ui.ctx().copy_text(url_string.clone());
@@ -306,6 +292,8 @@ impl ShareModal {
                     }
                 }
 
+                ui.add_space(12.0);
+
                 ui.list_item_scope("share_dialog_url_settings", |ui| {
                     url_settings_ui(ctx, ui, url, create_web_viewer_url);
                 });
@@ -313,6 +301,7 @@ impl ShareModal {
         );
     }
 }
+
 
 // --- Rest of the helper functions (unchanged and correct) ---
 
