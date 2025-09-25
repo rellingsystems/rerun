@@ -55,8 +55,8 @@ impl App {
     ) {
         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         // no wrapping: make as wide as needed
-
-        ui.menu_button("About", |ui| self.about_rerun_ui(ui, render_state));
+        //removed about button 
+        // ui.menu_button("About", |ui| self.about_rerun_ui(ui, render_state));
 
         ui.add_space(SPACING);
 
