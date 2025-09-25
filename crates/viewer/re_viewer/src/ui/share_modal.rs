@@ -452,8 +452,10 @@
 //         harness.snapshot("share_modal__dataset_partition_url_with_time_range");
 //     }
 // }
-
 use egui::{AtomExt as _, IntoAtoms, NumExt as _};
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
 
 use re_log_types::AbsoluteTimeRange;
 use re_redap_browser::EXAMPLES_ORIGIN;
@@ -532,11 +534,11 @@ impl ShareModal {
     }
 
     /// Downloads the RRD file based on the current URL
-    fn download_rrd(&mut self, url_string: String, ctx: &egui::Context) {
-        self.show_copied_feedback = true;
-
+    fn download_rrd(url_string: String) {
         #[cfg(target_arch = "wasm32")]
         {
+            use wasm_bindgen::JsCast;
+
             // Create download link for RRD file
             let download_url = format!("{}.rrd", url_string);
 
@@ -547,25 +549,18 @@ impl ShareModal {
                         if let Ok(link) = element.dyn_into::<web_sys::HtmlAnchorElement>() {
                             link.set_href(&download_url);
                             link.set_download("recording.rrd");
-                            link.style().set_property("display", "none").unwrap_or_default();
+                            let _ = link.style().set_property("display", "none");
 
                             if let Some(body) = document.body() {
-                                body.append_child(&link).unwrap_or_default();
+                                let _ = body.append_child(&link);
                                 link.click();
-                                body.remove_child(&link).unwrap_or_default();
+                                let _ = body.remove_child(&link);
                             }
                         }
                     }
                 }
             }
         }
-
-        // Reset feedback after a short delay
-        let ctx_clone = ctx.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(2));
-            ctx_clone.request_repaint();
-        });
     }
 
     /// Button that opens the share popup.
@@ -704,7 +699,11 @@ impl ShareModal {
                         .inner;
 
                     if download_button_response.clicked() {
-                        self.download_rrd(url_string.clone(), ui.ctx());
+                        Self::download_rrd(url_string.clone());
+                        self.show_copied_feedback = true;
+
+                        // Reset feedback after a short delay using egui's built-in mechanism
+                        ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
                     } else if !download_button_response.hovered() {
                         self.show_copied_feedback = false;
                     }
