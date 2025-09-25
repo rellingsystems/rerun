@@ -113,7 +113,7 @@ impl Callback {
 
 // Deserializes from JS string or array of strings.
 #[derive(Clone, Debug)]
-pub struct StringOrStringArray(Vec<String>);
+pub struct StringOrStringArray(pub Vec<String>);
 
 impl StringOrStringArray {
     pub fn into_inner(self) -> Vec<String> {
