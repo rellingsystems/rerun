@@ -1,4 +1,4 @@
-use egui::{vec2, Atom, AtomExt as _, IntoAtoms, NumExt as _};
+use egui::{vec2, AtomExt as _, IntoAtoms, NumExt as _};
 use std::collections::{HashMap, HashSet};
 
 use re_log_types::AbsoluteTimeRange;
@@ -6,8 +6,7 @@ use re_redap_browser::EXAMPLES_ORIGIN;
 use re_ui::{
     list_item::PropertyContent,
     modal::{ModalHandler, ModalWrapper},
-    UiExt as _,
-    Icon, icons,
+    UiExt as _, icons,
 };
 use re_uri::Fragment;
 use re_viewer_context::{
@@ -45,73 +44,6 @@ impl Default for ShareModal {
         }
     }
 }
-
-// --- Button Style Helpers ---
-
-/// Renders a primary, full-width button with a solid background.
-fn primary_button(
-    ui: &mut egui::Ui,
-    text: impl Into<egui::WidgetText>,
-    icon: Option<&Icon>,
-) -> egui::Response {
-    let tokens = ui.tokens();
-    let button_height = tokens.interact_size.y;
-
-    ui.scope(|ui| {
-        let visuals = &mut ui.style_mut().visuals;
-        visuals.override_text_color = Some(tokens.text_inverse);
-
-        let mut content = egui::RichText::new(text.into()).into_atoms();
-        if let Some(icon) = icon {
-            content.insert(0, Atom::from(" "));
-            content.insert(0, icon.as_image().tint(tokens.text_inverse));
-        }
-        content.insert(0, Atom::grow());
-        content.push(Atom::grow());
-
-        let button = egui::Button::new(content)
-            .min_size(vec2(ui.available_width(), button_height))
-            .rounding(tokens.rounding_small);
-
-        // Manually apply hover effect for custom background
-        let response_id = ui.next_auto_id();
-        let is_hovered = ui
-            .ctx()
-            .read_response(response_id)
-            .is_some_and(|r| r.hovered());
-        let fill_color = if is_hovered {
-            tokens.bg_fill_inverse_hover
-        } else {
-            tokens.bg_fill_inverse
-        };
-
-        ui.add(button.fill(fill_color).id(response_id))
-    })
-    .inner
-}
-
-/// Renders a secondary, full-width button with a standard background.
-fn secondary_button(
-    ui: &mut egui::Ui,
-    text: impl Into<egui::WidgetText>,
-    icon: Option<&Icon>,
-) -> egui::Response {
-    let tokens = ui.tokens();
-    let mut content = egui::RichText::new(text.into()).into_atoms();
-    if let Some(icon) = icon {
-        content.insert(0, Atom::from(" "));
-        content.insert(0, icon.as_image());
-    }
-    content.insert(0, Atom::grow());
-    content.push(Atom::grow());
-
-    ui.add(
-        egui::Button::new(content)
-            .min_size(vec2(ui.available_width(), tokens.interact_size.y))
-            .rounding(tokens.rounding_small),
-    )
-}
-
 
 impl ShareModal {
     pub fn set_additional_files(&mut self, files: Vec<DownloadableFile>) {
@@ -279,62 +211,97 @@ impl ShareModal {
                 ui.add_space(12.0);
 
                 if cfg!(target_arch = "wasm32") {
+                    // --- Primary Download RRD Button ---
                     let rrd_downloading = download_feedback.get("rrd").copied().unwrap_or(false);
-                    let (label, icon) = if rrd_downloading {
-                        ("Downloading...", None)
-                    } else {
-                        ("Download RRD", Some(&icons::DOWNLOAD))
-                    };
+                    let rrd_button_label = if rrd_downloading { "Downloading RRD..." } else { "Download RRD" };
 
-                    if primary_button(ui, label, icon).clicked() && !rrd_downloading {
+                    let rrd_button_response = ui.scope(|ui| {
+                        let tokens = ui.tokens();
+                        let visuals = &mut ui.style_mut().visuals;
+                        visuals.override_text_color = Some(tokens.text_inverse);
+                        let fill_color = tokens.bg_fill_inverse;
+                        ui.add(
+                            egui::Button::new(rrd_button_label)
+                                .fill(fill_color)
+                                .min_size(vec2(ui.available_width(), 32.0)),
+                        )
+                    }).inner;
+
+                    if rrd_button_response.clicked() && !rrd_downloading {
                         Self::download_file_from_url(&format!("{}.rrd", url_string), "recording.rrd");
                         download_feedback.insert("rrd".to_string(), true);
                     }
-                    if rrd_downloading {
-                        ui.ctx().request_repaint_for(std::time::Duration::from_millis(100));
+                    if rrd_downloading && !rrd_button_response.hovered() {
+                        // Reset feedback when not hovering
+                        download_feedback.insert("rrd".to_string(), false);
                     }
 
 
                     ui.add_space(16.0);
+
+                    // --- Annotation Buttons ---
                     ui.group(|ui| {
-                        ui.vertical_centered(|ui| ui.label("Download Annotations"));
-                        ui.add_space(8.0);
+                        ui.vertical(|ui| {
+                            ui.label("Download Annotations:");
+                            ui.add_space(8.0);
 
-                        let base_url = Self::get_annotation_base_url(&url_string).unwrap_or_default();
+                            if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
+                                let buttons_to_draw = [
+                                    ("video", "annotations.mp4", "Download Annotations Video"),
+                                    ("coords", "coordinates.csv", "Download Annotations Coordinates"),
+                                    ("actions", "actions.json", "Download Annotations Actions"),
+                                ];
 
-                        let buttons = [
-                            ("video", "annotations.mp4", "Video"),
-                            ("coords", "coordinates.csv", "Coordinates"),
-                            ("actions", "actions.json", "Actions"),
-                        ];
+                                for (id, filename, text) in buttons_to_draw {
+                                    let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
+                                    let label = if is_downloading { format!("Downloading {}...", filename) } else { text.to_string() };
 
-                        for (id, filename, name) in buttons {
-                            let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
-                            let label = if is_downloading { format!("Downloading {}...", name) } else { format!("Download {}", name) };
-
-                            if secondary_button(ui, label, Some(&icons::DOWNLOAD)).clicked() && !is_downloading {
-                                Self::download_file_from_url(&format!("{}_{}", base_url, filename), filename);
-                                download_feedback.insert(id.to_string(), true);
+                                    if ui.button(label).clicked() && !is_downloading {
+                                        let file_url = format!("{}_{}", base_url, filename);
+                                        Self::download_file_from_url(&file_url, filename);
+                                        download_feedback.insert(id.to_string(), true);
+                                    } else if is_downloading {
+                                        // Reset feedback
+                                        download_feedback.insert(id.to_string(), false);
+                                    }
+                                }
                             }
-                            if is_downloading {
-                                ui.ctx().request_repaint_for(std::time::Duration::from_millis(100));
-                            }
-                        }
+                        });
                     });
                 } else {
+                    // --- Primary Copy Link Button ---
                     let (label, icon) = if *show_copied_feedback {
-                        ("Copied!", Some(&icons::CHECKMARK))
+                        ("Copied!".into_atoms(), None)
                     } else {
-                        ("Copy link", Some(&icons::URL))
+                        (
+                            (
+                                egui::Atom::grow(),
+                                icons::URL.as_image().tint(ui.tokens().icon_inverse),
+                                "Copy link",
+                                egui::Atom::grow(),
+                            )
+                                .into_atoms(),
+                            Some(icons::URL),
+                        )
                     };
 
-                    let copy_link_response = primary_button(ui, label, icon);
+                    let copy_link_response = ui.scope(|ui| {
+                        let tokens = ui.tokens();
+                        let visuals = &mut ui.style_mut().visuals;
+                        visuals.override_text_color = Some(tokens.text_inverse);
+                        let fill_color = tokens.bg_fill_inverse;
+                        ui.add(
+                            egui::Button::new(label)
+                                .fill(fill_color)
+                                .min_size(vec2(ui.available_width(), 20.0)),
+                        )
+                    }).inner;
+
+
                     if copy_link_response.clicked() {
                         ui.ctx().copy_text(url_string.clone());
                         *show_copied_feedback = true;
-                    }
-
-                    if *show_copied_feedback && !copy_link_response.hovered() {
+                    } else if !copy_link_response.hovered() {
                         *show_copied_feedback = false;
                     }
                 }
@@ -347,8 +314,7 @@ impl ShareModal {
     }
 }
 
-
-// --- Rest of the helper functions (unchanged) ---
+// --- Rest of the helper functions (unchanged and correct) ---
 
 fn selectable_value_with_min_width<'a, Value: PartialEq>(
     ui: &mut egui::Ui,
