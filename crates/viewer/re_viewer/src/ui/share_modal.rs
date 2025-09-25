@@ -220,17 +220,12 @@ impl ShareModal {
         ui: &egui::Ui,
         web_viewer_base_url: Option<&url::Url>,
     ) {
-        // --- MODIFICATION: START ---
-        // CORRECTED: `let...else` was incorrect here for the web target.
-        // On native, we must have a `self.url`. On web, it's optional
-        // because we get URLs from startup_options.
         if !self.modal.is_open() {
             return;
         }
         if !cfg!(target_arch = "wasm32") && self.url.is_none() {
             return;
         }
-        // --- MODIFICATION: END ---
 
         let modal_title = if cfg!(target_arch = "wasm32") { "Export" } else { "Share" };
 
@@ -246,14 +241,12 @@ impl ShareModal {
 
                 if cfg!(target_arch = "wasm32") {
                     // --- MODIFICATION: START ---
-                    // CORRECTED: Access startup_options through `ctx.app_options()`.
-                    let startup_options = ctx.app_options();
+                    // CORRECTED: Access startup_options through `ctx.startup_options`.
+                    let startup_options = ctx.startup_options;
                     // --- MODIFICATION: END ---
 
                     // --- RRD Download Button ---
                     ui.add_space(8.0);
-                    // --- MODIFICATION: START ---
-                    // CORRECTED: Chain `.on_disabled_hover_text` to the outer response.
                     let rrd_button_response = ui.add_enabled_ui(startup_options.rrd_url.is_some(), |ui| {
                         let downloading = download_feedback.get("rrd").copied().unwrap_or(false);
                         let label = if downloading { "Downloading RRD..." } else { "Download RRD" };
@@ -265,7 +258,9 @@ impl ShareModal {
                         }
                         if downloading { ui.ctx().request_repaint(); }
                     });
-                    rrd_button_response.on_disabled_hover_text("RRD file URL not provided.");
+                    // --- MODIFICATION: START ---
+                    // CORRECTED: Call `.response.on_disabled_hover_text`.
+                    rrd_button_response.response.on_disabled_hover_text("RRD file URL not provided.");
                     // --- MODIFICATION: END ---
 
                     // --- Annotation Buttons ---
@@ -285,7 +280,7 @@ impl ShareModal {
                         }
                         if downloading { ui.ctx().request_repaint(); }
                     });
-                    video_button_response.on_disabled_hover_text("Video file URL not provided.");
+                    video_button_response.response.on_disabled_hover_text("Video file URL not provided.");
 
                     // --- CSV Button ---
                     ui.add_space(4.0);
@@ -300,7 +295,7 @@ impl ShareModal {
                         }
                         if downloading { ui.ctx().request_repaint(); }
                     });
-                    csv_button_response.on_disabled_hover_text("Coordinates file URL not provided.");
+                    csv_button_response.response.on_disabled_hover_text("Coordinates file URL not provided.");
 
                     // --- JSON Button ---
                     ui.add_space(4.0);
@@ -315,17 +310,14 @@ impl ShareModal {
                         }
                         if downloading { ui.ctx().request_repaint(); }
                     });
-                    json_button_response.on_disabled_hover_text("Actions file URL not provided.");
+                    json_button_response.response.on_disabled_hover_text("Actions file URL not provided.");
 
                 } else {
                     // --- NATIVE SHARE BUTTON ---
                     if let Some(url) = &mut self.url {
                         let url_string = {
                             let web_viewer_base_url = if *create_web_viewer_url { web_viewer_base_url } else { None };
-                            // --- MODIFICATION: START ---
-                            // CORRECTED: Removed `.as_ref()` which caused a trait bound error.
                             let url_string = url.sharable_url(web_viewer_base_url).unwrap_or_default();
-                            // --- MODIFICATION: END ---
                             let mut url_for_text_edit = url_string.clone();
                             ui.add(
                                 egui::TextEdit::singleline(&mut url_for_text_edit)
@@ -347,15 +339,12 @@ impl ShareModal {
                 }
 
                 if !cfg!(target_arch = "wasm32") {
-                    // --- MODIFICATION: START ---
-                    // CORRECTED: The `url` variable must be destructured from `self.url` again here for the borrow checker.
                     if let Some(url) = &mut self.url {
                         ui.add_space(12.0);
                         ui.list_item_scope("share_dialog_url_settings", |ui| {
                             url_settings_ui(ctx, ui, url, create_web_viewer_url);
                         });
                     }
-                    // --- MODIFICATION: END ---
                 }
             },
         );
