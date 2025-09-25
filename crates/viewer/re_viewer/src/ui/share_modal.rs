@@ -1,15 +1,15 @@
 use egui::{AtomExt as _, IntoAtoms, NumExt as _};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
+// WARNING: This unused import has been removed.
+// use wasm_bindgen::JsCast;
 
 use re_log_types::AbsoluteTimeRange;
 use re_redap_browser::EXAMPLES_ORIGIN;
 use re_ui::{
-    UiExt as _, icons,
     list_item::PropertyContent,
     modal::{ModalHandler, ModalWrapper},
+    UiExt as _, icons,
 };
 use re_uri::Fragment;
 use re_viewer_context::{
@@ -37,10 +37,10 @@ pub struct ShareModal {
     additional_files: Vec<DownloadableFile>,
 
     /// Which files are selected for download
-    selected_files: std::collections::HashSet<String>,
+    selected_files: HashSet<String>,
 
     /// Individual download feedback states
-    download_feedback: std::collections::HashMap<String, bool>,
+    download_feedback: HashMap<String, bool>,
 }
 
 impl Default for ShareModal {
@@ -53,8 +53,8 @@ impl Default for ShareModal {
             create_web_viewer_url,
             show_copied_feedback: false,
             additional_files: Vec::new(),
-            selected_files: std::collections::HashSet::new(),
-            download_feedback: std::collections::HashMap::new(),
+            selected_files: HashSet::new(),
+            download_feedback: HashMap::new(),
         }
     }
 }
@@ -203,15 +203,17 @@ impl ShareModal {
     }
 
     /// Creates a download button for a specific file type
+    // FIX: Changed from `&mut self` to passing `download_feedback` directly
+    // This avoids borrowing `self` inside the main UI closure.
     fn download_button(
-        &mut self,
+        download_feedback: &mut HashMap<String, bool>,
         ui: &mut egui::Ui,
         button_text: &str,
         file_url: &str,
         filename: &str,
         button_id: &str,
     ) -> bool {
-        let is_downloading = self.download_feedback.get(button_id).copied().unwrap_or(false);
+        let is_downloading = download_feedback.get(button_id).copied().unwrap_or(false);
 
         let button_label = if is_downloading {
             format!("Downloading {}...", filename)
@@ -223,18 +225,19 @@ impl ShareModal {
 
         if button_response.clicked() && !is_downloading {
             Self::download_file_from_url(file_url, filename);
-            self.download_feedback.insert(button_id.to_string(), true);
+            download_feedback.insert(button_id.to_string(), true);
 
             // Reset feedback after delay
             ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
             return true;
         } else if is_downloading && !button_response.hovered() {
             // Reset feedback when not hovering
-            self.download_feedback.insert(button_id.to_string(), false);
+            download_feedback.insert(button_id.to_string(), false);
         }
 
         false
     }
+
 
     /// Button that opens the share popup.
     pub fn button_ui(
@@ -296,6 +299,13 @@ impl ShareModal {
             "Share"
         };
 
+        // FIX: Extract mutable fields from `self` before the closure.
+        // This allows the closure to borrow these fields without borrowing all of `self`,
+        // resolving the conflict with the `self.modal.ui` call.
+        let create_web_viewer_url = &mut self.create_web_viewer_url;
+        let download_feedback = &mut self.download_feedback;
+        let show_copied_feedback = &mut self.show_copied_feedback;
+
         self.modal.ui(
             ui.ctx(),
             || ModalWrapper::new(modal_title),
@@ -307,7 +317,7 @@ impl ShareModal {
 
                 // URL display
                 let url_string = {
-                    let web_viewer_base_url = if self.create_web_viewer_url {
+                    let web_viewer_base_url = if *create_web_viewer_url {
                         web_viewer_base_url
                     } else {
                         None
@@ -328,7 +338,7 @@ impl ShareModal {
                     ui.add_space(12.0);
 
                     // Main RRD download button
-                    let rrd_downloading = self.download_feedback.get("rrd").copied().unwrap_or(false);
+                    let rrd_downloading = download_feedback.get("rrd").copied().unwrap_or(false);
                     let rrd_button_label = if rrd_downloading {
                         "Downloading RRD..."
                     } else {
@@ -353,10 +363,10 @@ impl ShareModal {
 
                     if rrd_button_response.clicked() && !rrd_downloading {
                         Self::download_rrd(url_string.clone());
-                        self.download_feedback.insert("rrd".to_string(), true);
+                        download_feedback.insert("rrd".to_string(), true);
                         ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
                     } else if rrd_downloading && !rrd_button_response.hovered() {
-                        self.download_feedback.insert("rrd".to_string(), false);
+                        download_feedback.insert("rrd".to_string(), false);
                     }
 
                     ui.add_space(16.0);
@@ -369,7 +379,8 @@ impl ShareModal {
 
                             if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
                                 // Video annotations button
-                                self.download_button(
+                                Self::download_button(
+                                    download_feedback,
                                     ui,
                                     "Download Annotations Video",
                                     &format!("{}_annotations.mp4", base_url),
@@ -380,7 +391,8 @@ impl ShareModal {
                                 ui.add_space(4.0);
 
                                 // Coordinates CSV button
-                                self.download_button(
+                                Self::download_button(
+                                    download_feedback,
                                     ui,
                                     "Download Annotations Coordinates",
                                     &format!("{}_coordinates.csv", base_url),
@@ -391,7 +403,8 @@ impl ShareModal {
                                 ui.add_space(4.0);
 
                                 // Actions JSON button
-                                self.download_button(
+                                Self::download_button(
+                                    download_feedback,
                                     ui,
                                     "Download Annotations Actions.json",
                                     &format!("{}_actions.json", base_url),
@@ -403,7 +416,7 @@ impl ShareModal {
                     });
                 } else {
                     // Native share functionality
-                    let copy_link_label = if self.show_copied_feedback {
+                    let copy_link_label = if *show_copied_feedback {
                         (
                             egui::Atom::grow(),
                             "Copied to clipboard!",
@@ -443,21 +456,21 @@ impl ShareModal {
 
                     if copy_link_response.clicked() {
                         ui.ctx().copy_text(url_string.clone());
-                        self.show_copied_feedback = true;
+                        *show_copied_feedback = true;
                     } else if !copy_link_response.hovered() {
-                        self.show_copied_feedback = false;
+                        *show_copied_feedback = false;
                     }
                 }
 
                 ui.list_item_scope("share_dialog_url_settings", |ui| {
-                    url_settings_ui(ctx, ui, url, &mut self.create_web_viewer_url);
+                    url_settings_ui(ctx, ui, url, create_web_viewer_url);
                 });
             },
         );
     }
 }
 
-// Rest of your existing helper functions remain the same...
+// No changes were needed in the helper functions below.
 fn selectable_value_with_min_width<'a, Value: PartialEq>(
     ui: &mut egui::Ui,
     min_width: f32,
