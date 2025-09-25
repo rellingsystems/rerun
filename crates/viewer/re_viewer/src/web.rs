@@ -662,7 +662,21 @@ impl From<PanelState> for re_types::blueprint::components::PanelState {
 #[derive(Clone, Default, Deserialize)]
 pub struct AppOptions {
     viewer_url: Option<String>,
-    url: Option<StringOrStringArray>,
+    url: Option<StringOrStringArray>, // Kept for backwards compatibility and general URL opening.
+
+    // --- MODIFICATION: START ---
+    // Specific URLs for the main RRD and downloadable annotations.
+    // This is the new, preferred way of specifying data sources for the web viewer from React.
+    #[serde(default)]
+    rrd_url: Option<String>,
+    #[serde(default)]
+    mp4_url: Option<String>,
+    #[serde(default)]
+    csv_url: Option<String>,
+    #[serde(default)]
+    json_url: Option<String>,
+    // --- MODIFICATION: END ---
+
     manifest_url: Option<String>,
     render_backend: Option<String>,
     video_decoder: Option<String>,
@@ -722,6 +736,14 @@ fn create_app(
     let AppOptions {
         viewer_url,
         url,
+
+        // --- MODIFICATION: START ---
+        rrd_url,
+        mp4_url,
+        csv_url,
+        json_url,
+        // --- MODIFICATION: END ---
+
         manifest_url,
         render_backend,
         video_decoder,
@@ -756,6 +778,12 @@ fn create_app(
         Ok(hw_accell) => Some(hw_accell),
     });
 
+    // --- MODIFICATION: START ---
+    // Prioritize `rrd_url` as the primary data source to load at startup.
+    // Fall back to the general `url` field for backward compatibility.
+    let initial_urls_to_load = rrd_url.map(StringOrStringArray::String).or(url);
+    // --- MODIFICATION: END ---
+
     let startup_options = crate::StartupOptions {
         memory_limit: re_memory::MemoryLimit {
             // On wasm32 we only have 4GB of memory to play around with.
@@ -785,6 +813,14 @@ fn create_app(
 
         enable_history,
         viewer_url,
+
+        // --- MODIFICATION: START ---
+        // These URLs are passed through to the `App` state so the `ShareModal` can access them.
+        // NOTE: The `StartupOptions` struct in `startup_options.rs` will need these fields added.
+        mp4_url,
+        csv_url,
+        json_url,
+        // --- MODIFICATION: END ---
     };
     crate::customize_eframe_and_setup_renderer(cc)?;
 
@@ -806,7 +842,10 @@ fn create_app(
         app.set_examples_manifest_url(manifest_url);
     }
 
-    if let Some(urls) = url {
+    // --- MODIFICATION: START ---
+    // Use the prioritized URL list for loading.
+    if let Some(urls) = initial_urls_to_load {
+    // --- MODIFICATION: END ---
         for url in urls.into_inner() {
             match url.parse::<open_url::ViewerOpenUrl>() {
                 Ok(url) => {
