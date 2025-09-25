@@ -11,7 +11,7 @@ use re_uri::Fragment;
 use re_viewer_context::{
     open_url::ViewerOpenUrl, DisplayMode, ItemCollection, RecordingConfig, StoreHub, ViewerContext,
 }; open_url::ViewerOpenUrl,
-
+}
 // --- CORRECTED HELPER FOR THE EXACT BUTTON STYLE YOU WANT ---
 /// Renders a full-width button with the primary "inverted" style.
 fn primary_button_style(ui: &mut egui::Ui, text: impl Into<egui::WidgetText>) -> egui::Response {
