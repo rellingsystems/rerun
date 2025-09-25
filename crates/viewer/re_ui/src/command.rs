@@ -34,7 +34,6 @@ pub enum UICommand {
     Quit,
 
     OpenWebHelp,
-    OpenRerunDiscord,
 
     ResetViewer,
     ClearActiveBlueprint,
@@ -168,10 +167,7 @@ impl UICommand {
                 "Help",
                 "Visit the help page on our website, with troubleshooting tips and more",
             ),
-            Self::OpenRerunDiscord => (
-                "Rerun Discord",
-                "Visit the Rerun Discord server, where you can ask questions and get help",
-            ),
+
 
             Self::ResetViewer => (
                 "Reset Viewer",
@@ -379,7 +375,6 @@ impl UICommand {
             Self::Quit => smallvec![KeyboardShortcut::new(Modifiers::ALT, Key::F4)],
 
             Self::OpenWebHelp => smallvec![],
-            Self::OpenRerunDiscord => smallvec![],
 
             #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
             Self::Quit => smallvec![cmd(Key::Q)],
@@ -471,13 +466,12 @@ impl UICommand {
     pub fn icon(self) -> Option<&'static crate::Icon> {
         match self {
             Self::OpenWebHelp => Some(&crate::icons::EXTERNAL_LINK),
-            Self::OpenRerunDiscord => Some(&crate::icons::DISCORD),
             _ => None,
         }
     }
 
     pub fn is_link(self) -> bool {
-        matches!(self, Self::OpenWebHelp | Self::OpenRerunDiscord)
+        matches!(self, Self::OpenWebHelp)
     }
 
     #[must_use = "Returns the Command that was triggered by some keyboard shortcut"]

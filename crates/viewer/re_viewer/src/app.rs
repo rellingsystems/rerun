@@ -1346,18 +1346,13 @@ impl App {
 
             UICommand::OpenWebHelp => {
                 egui_ctx.open_url(egui::output::OpenUrl {
-                    url: "https://www.rerun.io/docs/getting-started/navigating-the-viewer"
+                    url: "https://www.rellingsystems.com"
                         .to_owned(),
                     new_tab: true,
                 });
             }
 
-            UICommand::OpenRerunDiscord => {
-                egui_ctx.open_url(egui::output::OpenUrl {
-                    url: "https://discord.gg/PXtCgFBSmH".to_owned(),
-                    new_tab: true,
-                });
-            }
+
 
             UICommand::ResetViewer => self.command_sender.send_system(SystemCommand::ResetViewer),
             UICommand::ClearActiveBlueprint => {
