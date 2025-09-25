@@ -668,13 +668,13 @@ pub struct AppOptions {
     // Specific URLs for the main RRD and downloadable annotations.
     // This is the new, preferred way of specifying data sources for the web viewer from React.
     #[serde(default)]
-    rrd_url: Option<String>,
+    pub rrd_url: Option<String>,
     #[serde(default)]
-    mp4_url: Option<String>,
+    pub mp4_url: Option<String>,
     #[serde(default)]
-    csv_url: Option<String>,
+    pub csv_url: Option<String>,
     #[serde(default)]
-    json_url: Option<String>,
+    pub json_url: Option<String>,
     // --- MODIFICATION: END ---
 
     manifest_url: Option<String>,
@@ -779,8 +779,10 @@ fn create_app(
     });
 
     // --- MODIFICATION: START ---
-    // CORRECTED: Use a closure to explicitly convert the String into StringOrStringArray.
-    let initial_urls_to_load = rrd_url.map(|s| s.into()).or(url);
+    // CORRECTED: The previous code had a compile error here.
+    // The correct way to convert a single `String` into a `StringOrStringArray`
+    // is to wrap it in a `vec![]` and then construct the tuple struct.
+    let initial_urls_to_load = rrd_url.clone().map(|s| StringOrStringArray(vec![s])).or(url);
     // --- MODIFICATION: END ---
 
     let startup_options = crate::StartupOptions {
@@ -814,20 +816,13 @@ fn create_app(
         viewer_url,
 
         // --- MODIFICATION: START ---
-        // These URLs are passed through to the `App` state so the `ShareModal` can access them.
-        // NOTE: The compiler will error here until these fields are added to the `StartupOptions`
-        // struct, which is located in `crates/viewer/re_viewer/src/startup_options.rs`.
-        //
-        // You must add these public fields to that struct:
-        //
-        // pub mp4_url: Option<String>,
-        // pub csv_url: Option<String>,
-        // pub json_url: Option<String>,
-        //
-        // TODO(user): Uncomment the following lines after modifying startup_options.rs
-        // mp4_url,
-        // csv_url,
-        // json_url,
+        // CORRECTED: Pass all the new URL fields to the StartupOptions.
+        // This requires the fields to have been added to the StartupOptions struct
+        // in `startup_options.rs`.
+        rrd_url,
+        mp4_url,
+        csv_url,
+        json_url,
         // --- MODIFICATION: END ---
     };
     crate::customize_eframe_and_setup_renderer(cc)?;
