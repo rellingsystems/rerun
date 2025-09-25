@@ -142,7 +142,6 @@ impl App {
         ui.add_space(SPACING);
 
         UICommand::OpenWebHelp.menu_button_ui(ui, &self.command_sender);
-        UICommand::OpenRerunDiscord.menu_button_ui(ui, &self.command_sender);
 
         #[cfg(not(target_arch = "wasm32"))]
         {
