@@ -87,9 +87,6 @@ impl ShareModal {
         self.selected_files = self.additional_files.iter().map(|f| f.name.clone()).collect();
     }
 
-    // --- MODIFICATION: START ---
-    // These functions are no longer needed as we get explicit URLs from the startup options on web.
-    // They are kept for now to support the native "Share" functionality if it uses them.
     fn get_annotation_base_url(url_string: &str) -> Option<String> {
         url_string.strip_suffix(".rrd").map_or_else(
             || Some(url_string.to_string()),
@@ -121,7 +118,6 @@ impl ShareModal {
             ]);
         }
     }
-    // --- MODIFICATION: END ---
 
     fn current_url(
         store_hub: &StoreHub,
@@ -152,12 +148,9 @@ impl ShareModal {
 
     fn open_with_url(&mut self, url: ViewerOpenUrl) {
         self.url = Some(url);
-        // On native, we might still generate files for sharing. On web, this is no longer used.
-        if !cfg!(target_arch = "wasm32") {
-            if let Some(url_ref) = &self.url {
-                let url_string = url_ref.sharable_url(None).unwrap_or_default();
-                self.generate_annotation_files(&url_string);
-            }
+        if let Some(url_ref) = &self.url {
+            let url_string = url_ref.sharable_url(None).unwrap_or_default();
+            self.generate_annotation_files(&url_string);
         }
         self.modal.open();
     }
@@ -224,13 +217,8 @@ impl ShareModal {
         ui: &egui::Ui,
         web_viewer_base_url: Option<&url::Url>,
     ) {
-        // The `self.url` is now primarily for the native "Share" feature.
-        // On web, we will get the URLs directly from `ctx.startup_options`.
         let Some(url) = &mut self.url else {
-            // On web, the modal can still open without a `self.url`
-            if !cfg!(target_arch = "wasm32") {
-                return;
-            }
+            return;
         };
 
         let modal_title = if cfg!(target_arch = "wasm32") { "Export" } else { "Share" };
@@ -245,84 +233,54 @@ impl ShareModal {
             |ui| {
                 ui.set_max_height((ui.ctx().screen_rect().height() - 100.0).at_least(0.0).at_most(640.0));
 
-                // --- MODIFICATION: START ---
-                // This entire block is replaced for the web target.
+                let url_string = {
+                    let web_viewer_base_url = if *create_web_viewer_url { web_viewer_base_url } else { None };
+                    let url_string = url.sharable_url(web_viewer_base_url).unwrap_or_default();
+                    let mut url_for_text_edit = url_string.clone();
+                    ui.add(
+                        egui::TextEdit::singleline(&mut url_for_text_edit)
+                            .desired_width(f32::INFINITY)
+                    );
+                    url_string
+                };
+
+                ui.add_space(12.0);
+
                 if cfg!(target_arch = "wasm32") {
-                    let startup_options = &ctx.startup_options;
+                    let rrd_downloading = download_feedback.get("rrd").copied().unwrap_or(false);
+                    let rrd_button_label = if rrd_downloading { "Downloading RRD..." } else { "Download RRD" };
+                    if primary_button_style(ui, rrd_button_label).clicked() && !rrd_downloading {
+                        Self::download_file_from_url(&format!("{}.rrd", url_string), "recording.rrd");
+                        download_feedback.insert("rrd".to_string(), true);
+                    }
+                    if rrd_downloading { ui.ctx().request_repaint(); }
 
-                    // --- RRD Download Button ---
-                    ui.add_space(8.0);
-                    ui.add_enabled_ui(startup_options.rrd_url.is_some(), |ui| {
-                        let downloading = download_feedback.get("rrd").copied().unwrap_or(false);
-                        let label = if downloading { "Downloading RRD..." } else { "Download RRD" };
-                        if primary_button_style(ui, label).clicked() && !downloading {
-                            if let Some(url) = &startup_options.rrd_url {
-                                Self::download_file_from_url(url, "recording.rrd");
-                                download_feedback.insert("rrd".to_string(), true);
-                            }
-                        }
-                        if downloading { ui.ctx().request_repaint(); }
-                    }).inner.on_disabled_hover_text("RRD file URL not provided.");
-
-                    // --- Annotation Buttons ---
                     ui.add_space(12.0);
                     ui.label("Download Annotations:");
-
-                    // --- Video Button ---
                     ui.add_space(4.0);
-                    ui.add_enabled_ui(startup_options.mp4_url.is_some(), |ui| {
-                        let downloading = download_feedback.get("video").copied().unwrap_or(false);
-                        let label = if downloading { "Downloading Video..." } else { "Download Annotations Video" };
-                        if primary_button_style(ui, label).clicked() && !downloading {
-                            if let Some(url) = &startup_options.mp4_url {
-                                Self::download_file_from_url(url, "annotations.mp4");
-                                download_feedback.insert("video".to_string(), true);
-                            }
-                        }
-                        if downloading { ui.ctx().request_repaint(); }
-                    }).inner.on_disabled_hover_text("Video file URL not provided.");
 
-                    // --- CSV Button ---
-                    ui.add_space(4.0);
-                    ui.add_enabled_ui(startup_options.csv_url.is_some(), |ui| {
-                        let downloading = download_feedback.get("csv").copied().unwrap_or(false);
-                        let label = if downloading { "Downloading Coordinates..." } else { "Download Annotations Coordinates" };
-                        if primary_button_style(ui, label).clicked() && !downloading {
-                            if let Some(url) = &startup_options.csv_url {
-                                Self::download_file_from_url(url, "coordinates.csv");
-                                download_feedback.insert("csv".to_string(), true);
-                            }
-                        }
-                        if downloading { ui.ctx().request_repaint(); }
-                    }).inner.on_disabled_hover_text("Coordinates file URL not provided.");
+                    if let Some(base_url) = Self::get_annotation_base_url(&url_string) {
+                        let buttons_to_draw = [
+                            ("video", "annotations.mp4", "Download Annotations Video"),
+                            ("coords", "coordinates.csv", "Download Annotations Coordinates"),
+                            ("actions", "actions.json", "Download Annotations Actions"),
+                        ];
 
-                    // --- JSON Button ---
-                    ui.add_space(4.0);
-                    ui.add_enabled_ui(startup_options.json_url.is_some(), |ui| {
-                        let downloading = download_feedback.get("json").copied().unwrap_or(false);
-                        let label = if downloading { "Downloading Actions..." } else { "Download Annotations Actions" };
-                        if primary_button_style(ui, label).clicked() && !downloading {
-                            if let Some(url) = &startup_options.json_url {
-                                Self::download_file_from_url(url, "actions.json");
-                                download_feedback.insert("json".to_string(), true);
-                            }
-                        }
-                        if downloading { ui.ctx().request_repaint(); }
-                    }).inner.on_disabled_hover_text("Actions file URL not provided.");
+                        for (id, filename, text) in buttons_to_draw {
+                            ui.add_space(4.0);
+                            let is_downloading = download_feedback.get(id).copied().unwrap_or(false);
+                            let label = if is_downloading { format!("Downloading {}...", filename) } else { text.to_string() };
 
+                            if primary_button_style(ui, label).clicked() && !is_downloading {
+                                let file_url = format!("{}_{}", base_url, filename);
+                                Self::download_file_from_url(&file_url, filename);
+                                download_feedback.insert(id.to_string(), true);
+                            }
+                            if is_downloading { ui.ctx().request_repaint(); }
+                        }
+                    }
                 } else {
                     // --- NATIVE SHARE BUTTON ---
-                    // This block for native "Share" functionality remains unchanged.
-                    let url_string = {
-                        let web_viewer_base_url = if *create_web_viewer_url { web_viewer_base_url } else { None };
-                        let url_string = url.as_ref().and_then(|url| url.sharable_url(web_viewer_base_url).ok()).unwrap_or_default();
-                        let mut url_for_text_edit = url_string.clone();
-                        ui.add(
-                            egui::TextEdit::singleline(&mut url_for_text_edit)
-                                .desired_width(f32::INFINITY)
-                        );
-                        url_string
-                    };
                     let label: egui::WidgetText = if *show_copied_feedback { "Copied!".into() } else { "Copy link".into() };
                     let copy_link_response = primary_button_style(ui, label);
 
@@ -334,19 +292,12 @@ impl ShareModal {
                         *show_copied_feedback = false;
                     }
                 }
-                // --- MODIFICATION: END ---
 
-                // --- MODIFICATION: START ---
-                // The URL settings are only relevant for the native "Share" feature now.
-                if !cfg!(target_arch = "wasm32") {
-                    if let Some(url) = url {
-                        ui.add_space(12.0);
-                        ui.list_item_scope("share_dialog_url_settings", |ui| {
-                            url_settings_ui(ctx, ui, url, create_web_viewer_url);
-                        });
-                    }
-                }
-                // --- MODIFICATION: END ---
+                ui.add_space(12.0);
+
+                ui.list_item_scope("share_dialog_url_settings", |ui| {
+                    url_settings_ui(ctx, ui, url, create_web_viewer_url);
+                });
             },
         );
     }
