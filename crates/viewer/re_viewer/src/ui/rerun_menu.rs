@@ -55,7 +55,7 @@ impl App {
     ) {
         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         // no wrapping: make as wide as needed
-        //removed about button 
+        //removed about button
         // ui.menu_button("About", |ui| self.about_rerun_ui(ui, render_state));
 
         ui.add_space(SPACING);
@@ -150,57 +150,7 @@ impl App {
         }
     }
 
-    fn about_rerun_ui(&self, ui: &mut egui::Ui, render_state: Option<&egui_wgpu::RenderState>) {
-        let re_build_info::BuildInfo {
-            crate_name,
-            features,
-            version,
-            rustc_version,
-            llvm_version,
-            git_hash,
-            git_branch: _,
-            is_in_rerun_workspace: _,
-            target_triple,
-            datetime,
-        } = self.build_info();
-
-        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-
-        let git_hash_suffix = if git_hash.is_empty() {
-            String::new()
-        } else {
-            let short_git_hash = &git_hash[..std::cmp::min(git_hash.len(), 7)];
-            format!("({short_git_hash})")
-        };
-
-        let mut label = format!(
-            "{crate_name} {version} {git_hash_suffix}\n\
-            {target_triple}"
-        );
-
-        // It is really the features of `rerun-cli` (the `rerun` binary) that are interesting.
-        // For the web-viewer we get `crate_name: "re_viewer"` here, which is much less interesting.
-        if crate_name == "rerun-cli" && !features.is_empty() {
-            label += &format!("\n{crate_name} features: {features}");
-        }
-
-        if !rustc_version.is_empty() {
-            label += &format!("\nrustc {rustc_version}");
-            if !llvm_version.is_empty() {
-                label += &format!(", LLVM {llvm_version}");
-            }
-        }
-
-        if !datetime.is_empty() {
-            label += &format!("\nbuilt {datetime}");
-        }
-
-        ui.label(label);
-
-        if let Some(render_state) = render_state {
-            render_state_ui(ui, render_state);
-        }
-    }
+   
 
     fn save_buttons_ui(&self, ui: &mut egui::Ui, store_ctx: Option<&StoreContext<'_>>) {
         use re_ui::UICommandSender as _;

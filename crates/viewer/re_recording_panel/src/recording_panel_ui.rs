@@ -29,7 +29,7 @@ pub fn recordings_panel_ui(
 
     ui.panel_content(|ui| {
         ui.panel_title_bar_with_buttons(
-            "Recordings",
+            "Video Repository",
             Some(
                 "These are the Recordings currently loaded in the Viewer, organized by application",
             ),
@@ -163,40 +163,40 @@ fn all_sections_ui(
     }
 
     //
-    // Examples
+    // Examples removed
     //
 
-    if recording_panel_data.show_example_section {
-        let item = Item::RedapServer(EXAMPLES_ORIGIN.clone());
-        let selected = ctx.is_selected_or_loading(&item);
-        let active = matches!(
-            ctx.display_mode(),
-            DisplayMode::RedapServer(origin) if origin == &*EXAMPLES_ORIGIN
-        );
-        let list_item = ui.list_item().header().selected(selected).active(active);
-        let title = list_item::LabelContent::header("Rerun examples");
-        let response = if recording_panel_data.example_apps.is_empty() {
-            list_item.show_flat(ui, title)
-        } else {
-            list_item
-                .show_hierarchical_with_children(
-                    ui,
-                    egui::Id::new("example items"),
-                    true,
-                    title,
-                    |ui| {
-                        for app_id_data in &recording_panel_data.example_apps {
-                            app_id_section_ui(ctx, ui, app_id_data);
-                        }
-                    },
-                )
-                .item_response
-        };
+    // if recording_panel_data.show_example_section {
+    //     let item = Item::RedapServer(EXAMPLES_ORIGIN.clone());
+    //     let selected = ctx.is_selected_or_loading(&item);
+    //     let active = matches!(
+    //         ctx.display_mode(),
+    //         DisplayMode::RedapServer(origin) if origin == &*EXAMPLES_ORIGIN
+    //     );
+    //     let list_item = ui.list_item().header().selected(selected).active(active);
+    //     let title = list_item::LabelContent::header("Rerun examples");
+    //     let response = if recording_panel_data.example_apps.is_empty() {
+    //         list_item.show_flat(ui, title)
+    //     } else {
+    //         list_item
+    //             .show_hierarchical_with_children(
+    //                 ui,
+    //                 egui::Id::new("example items"),
+    //                 true,
+    //                 title,
+    //                 |ui| {
+    //                     for app_id_data in &recording_panel_data.example_apps {
+    //                         app_id_section_ui(ctx, ui, app_id_data);
+    //                     }
+    //                 },
+    //             )
+    //             .item_response
+    //     };
 
-        if response.clicked() {
-            re_redap_browser::switch_to_welcome_screen(ctx.command_sender());
-        }
-    }
+    //     if response.clicked() {
+    //         re_redap_browser::switch_to_welcome_screen(ctx.command_sender());
+    //     }
+    // }
 
     //
     // Loading receivers
