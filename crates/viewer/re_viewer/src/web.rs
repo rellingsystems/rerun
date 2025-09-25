@@ -779,10 +779,8 @@ fn create_app(
     });
 
     // --- MODIFICATION: START ---
-    // Prioritize `rrd_url` as the primary data source to load at startup.
-    // The previous code had a compile error here. `StringOrStringArray` does not have an
-    // associated item `String`. The correct way is to use `From::from` or `Into::into`.
-    let initial_urls_to_load = rrd_url.map(StringOrStringArray::from).or(url);
+    // CORRECTED: Use a closure to explicitly convert the String into StringOrStringArray.
+    let initial_urls_to_load = rrd_url.map(|s| s.into()).or(url);
     // --- MODIFICATION: END ---
 
     let startup_options = crate::StartupOptions {
@@ -819,7 +817,8 @@ fn create_app(
         // These URLs are passed through to the `App` state so the `ShareModal` can access them.
         // NOTE: The compiler will error here until these fields are added to the `StartupOptions`
         // struct, which is located in `crates/viewer/re_viewer/src/startup_options.rs`.
-        // You must add these public fields:
+        //
+        // You must add these public fields to that struct:
         //
         // pub mp4_url: Option<String>,
         // pub csv_url: Option<String>,

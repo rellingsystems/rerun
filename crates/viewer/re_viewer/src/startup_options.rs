@@ -82,6 +82,16 @@ pub struct StartupOptions {
     /// The base viewer url that's used when sharing a link in this viewer.
     #[cfg(target_arch = "wasm32")]
     pub viewer_url: Option<String>,
+
+    // --- MODIFICATION: START ---
+    // These fields are used to pass explicit URLs for downloading files
+    // in the web-based "Export" modal.
+    // They are populated from `AppOptions` in `web.rs`.
+    pub rrd_url: Option<String>,
+    pub mp4_url: Option<String>,
+    pub csv_url: Option<String>,
+    pub json_url: Option<String>,
+    // --- MODIFICATION: END ---
 }
 
 impl StartupOptions {
@@ -155,6 +165,14 @@ impl Default for StartupOptions {
 
             #[cfg(target_arch = "wasm32")]
             viewer_url: None,
+
+            // --- MODIFICATION: START ---
+            // Initialize the new fields to None by default.
+            rrd_url: None,
+            mp4_url: None,
+            csv_url: None,
+            json_url: None,
+            // --- MODIFICATION: END ---
         }
     }
 }
